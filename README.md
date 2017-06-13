@@ -1,7 +1,7 @@
 ## mapbox2mapnik
 
-mapbox2mapnik is a plugin for [Mapnik library] (https://github.com/mapnik/mapnik)
-which allows it to use [Mapbox style format] (https://www.mapbox.com/mapbox-gl-js/style-spec/).
+mapbox2mapnik is a plugin for [Mapnik library](https://github.com/mapnik/mapnik)
+which allows it to use [Mapbox style format](https://www.mapbox.com/mapbox-gl-js/style-spec/).
 
 ## Dependencies
 
