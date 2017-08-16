@@ -591,45 +591,28 @@ static bool ParseStyle(mapnik::Map &map, const std::string &style_str, const std
 
         std::vector<mapnik::rule> rules;
 
-        if (layer_type == "background")
-        {
+        if (layer_type == "background") {
             std::string bgcolor_string = mapbox_paint.get("background-color", "#000000").asString();
             mapnik::color bgcolor(bgcolor_string);
             map.set_background(bgcolor);
             continue;
-        }
-        else if (layer_type == "fill")
-        {
-            if (mapbox_paint.isMember("fill-extrude-height"))
-            {
-                parse_layer<BuildingParser>(mapbox_layer, id, rules, res_full_path);
-            }
-            else if (mapbox_paint.isMember("fill-pattern"))
-            {
+        } else if (layer_type == "fill") {
+            if (mapbox_paint.isMember("fill-pattern")) {
                 parse_layer<PatternPolygonParser>(mapbox_layer, id, rules, res_full_path);
-            }
-            else
-            {
+            } else {
                 parse_layer<PolygonParser>(mapbox_layer, id, rules, res_full_path);
             }
-        }
-        else if (layer_type == "line")
-        {
-            if (mapbox_paint.isMember("line-pattern"))
-            {
+        } else if (layer_type == "fill-extrusion") {
+            parse_layer<BuildingParser>(mapbox_layer, id, rules, res_full_path);
+        } else if (layer_type == "line") {
+            if (mapbox_paint.isMember("line-pattern")) {
                 parse_layer<PatternLineParser>(mapbox_layer, id, rules, res_full_path);
-            }
-            else
-            {
+            } else {
                 parse_layer<LineParser>(mapbox_layer, id, rules, res_full_path);
             }
-        }
-        else if (layer_type == "symbol")
-        {
+        } else if (layer_type == "symbol") {
             parse_layer<SymbolParser>(mapbox_layer, id, rules, res_full_path);
-        }
-        else
-        {
+        } else {
             LOG(ERROR) << "Invalid layer type: " << layer_type;
         }
 
@@ -796,9 +779,9 @@ struct LineParser {
 struct BuildingParser {
     void operator() (const PropertyParser &prop_parser, const std::string &res_path, mapnik::rule& output_rule) {
         mapnik::building_symbolizer bs;
-        prop_parser.put_to_symbolizer<double>(bs, mapnik::keys::height, "fill-extrude-height");
-        prop_parser.put_to_symbolizer<mapnik::color>(bs, mapnik::keys::fill, "fill-color");
-        prop_parser.put_to_symbolizer<double>(bs, mapnik::keys::fill_opacity, "fill-opacity");
+        prop_parser.put_to_symbolizer<double>(bs, mapnik::keys::height, "fill-extrusion-heigh");
+        prop_parser.put_to_symbolizer<mapnik::color>(bs, mapnik::keys::fill, "fill-extrusion-color");
+        prop_parser.put_to_symbolizer<double>(bs, mapnik::keys::fill_opacity, "fill-extrusion-opacity");
         output_rule.append(std::move(bs));
     }
 };
