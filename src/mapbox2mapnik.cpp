@@ -558,12 +558,18 @@ static inline void WarnNotSupported(const PropertyParser& parser, const std::str
 }
 
 
-static bool ParseStyle(mapnik::Map &map, const std::string &style_str, const std::string& base_path) {
+static bool ParseStyle(mapnik::Map &map, const std::string& style_str, const std::string& base_path) {
     Json::Value root;
-    Json::Reader reader;
-    bool parsingSuccessful = reader.parse(style_str, root, false);
-    if (!parsingSuccessful)
+    Json::CharReaderBuilder cr_builder;
+    std::unique_ptr<Json::CharReader> char_reader(cr_builder.newCharReader());
+    std::string json_erros;
+    bool parsed = char_reader->parse(style_str.data(), style_str.data() + style_str.size(),
+                                                &root, &json_erros);
+    if (!parsed) {
+        LOG(ERROR) << "Errors while pasing style json:\n" << json_erros;
         return false;
+    }
+    char_reader.reset();
 
     const Json::Value& root_layers = root["layers"];
     if (!root_layers.isArray()) {
