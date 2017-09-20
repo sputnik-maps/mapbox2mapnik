@@ -25,6 +25,7 @@
 #include <mapnik/font_engine_freetype.hpp>
 #include <mapnik/layer.hpp>
 #include <mapnik/map.hpp>
+#include <mapnik/marker_cache.hpp>
 #include <mapnik/rule.hpp>
 #include <mapnik/symbolizer.hpp>
 #include <mapnik/symbolizer_enumerations.hpp>
@@ -40,6 +41,8 @@
 
 #include <mapnik/util/fs.hpp>
 #include <mapnik/util/variant.hpp>
+
+#include "json_util.hpp"
 
 
 namespace sputnik {
@@ -259,20 +262,6 @@ private:
     bool valid_{false};
 };
 
-static bool ParseStyle(mapnik::Map &map, const std::string &style_str, const std::string& base_path);
-
-class PropertyParser;
-
-struct PatternLineParser;
-struct LineParser;
-struct BuildingParser;
-struct PatternPolygonParser;
-struct PolygonParser;
-struct SymbolParser;
-static std::string NormalizeFontName(const std::string& font_name);
-static mapnik::formatting::node_ptr ParseTextField(const std::string& text_field);
-static mapnik::expression_ptr ParseFilter(const Json::Value& mapbox_filter);
-
 
 namespace detail {
 
@@ -445,6 +434,12 @@ public:
     }
 
     template <typename T>
+    T get_property(const std::string& prop_name, const T& default_val) const {
+        auto prop = detail::get_property<T>(prop_view_, prop_name);
+        return prop ? *prop : default_val;
+    }
+
+    template <typename T>
     boost::optional<value_type> get_value(const std::string& prop_name) const {
         return detail::get_variant<value_type, T>(prop_view_, prop_name);
     }
@@ -535,6 +530,20 @@ void parse_layer(const Json::Value& mapbox_layer, const std::string& id,
     }
 }
 
+static bool ParseStyle(mapnik::Map &map, const std::string &style_str, const std::string& base_path);
+
+struct PatternLineParser;
+struct LineParser;
+struct BuildingParser;
+struct PatternPolygonParser;
+struct PolygonParser;
+struct SymbolParser;
+struct CircleParcer;
+static std::string NormalizeFontName(const std::string& font_name);
+static mapnik::formatting::node_ptr ParseTextField(const std::string& text_field);
+static mapnik::expression_ptr ParseFilter(const Json::Value& mapbox_filter);
+
+
 void load_mapbox_map(mapnik::Map & map, std::string const& filename, bool strict, const std::string& base_path) {
     std::ifstream file_stream(filename, std::ifstream::binary);
     if (!file_stream.is_open()) {
@@ -590,10 +599,18 @@ static bool ParseStyle(mapnik::Map &map, const std::string& style_str, const std
             LOG(ERROR) << "Invalid layer!\n" << mapbox_layer;
             continue;
         }
+
         const Json::Value& mapbox_paint = mapbox_layer["paint"];
-        std::string id = mapbox_layer.get("id", "").asString();
-        std::string source_layer_name = mapbox_layer.get("source-layer", "").asString();
-        std::string layer_type = mapbox_layer.get("type", "").asString();
+        const Json::Value& layout = mapbox_layer["layout"];
+        if (layout.isObject()) {
+            auto visibility = FromJson<std::string>("visibility");
+            if (visibility && *visibility == "none") {
+                continue;
+            }
+        }
+        std::string id = FromJson<std::string>("id", "");
+        std::string source_layer_name = FromJson<std::string>("source-layer", "");
+        std::string layer_type = FromJson<std::string>("type", "");
 
         std::vector<mapnik::rule> rules;
 
@@ -618,6 +635,8 @@ static bool ParseStyle(mapnik::Map &map, const std::string& style_str, const std
             }
         } else if (layer_type == "symbol") {
             parse_layer<SymbolParser>(mapbox_layer, id, rules, res_full_path);
+        } else if (layer_type == "circle") {
+            parse_layer<CircleParcer>(mapbox_layer, id, rules, res_full_path);
         } else {
             LOG(ERROR) << "Invalid layer type: " << layer_type;
         }
@@ -779,6 +798,23 @@ struct LineParser {
         }
 
         output_rule.append(std::move(ls));
+    }
+};
+
+struct CircleParcer {
+    void operator() (const PropertyParser &prop_parser, const std::string &res_path, mapnik::rule& output_rule) {
+        mapnik::markers_symbolizer ms;
+        std::string filename = mapnik::marker_cache::instance().known_svg_prefix_ + "ellipse";
+        mapnik::put(ms, mapnik::keys::file, filename);
+        double diameter = prop_parser.get_property<double>("circle-radius", 5.0) * 2;
+        mapnik::put(ms, mapnik::keys::width, diameter);
+        mapnik::put(ms, mapnik::keys::height, diameter);
+        prop_parser.put_to_symbolizer<mapnik::color>(ms, mapnik::keys::fill, "circle-color");
+        prop_parser.put_to_symbolizer<double>(ms, mapnik::keys::opacity, "circle-opacity");
+        prop_parser.put_to_symbolizer<mapnik::color>(ms, mapnik::keys::stroke, "circle-stroke-color");
+        prop_parser.put_to_symbolizer<double>(ms, mapnik::keys::stroke_opacity, "circle-stroke-opacity");
+        prop_parser.put_to_symbolizer<double>(ms, mapnik::keys::stroke_width, "circle-stroke-width");
+        WarnNotSupported(prop_parser, "circle-blur");
     }
 };
 
