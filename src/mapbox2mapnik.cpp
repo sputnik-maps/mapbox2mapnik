@@ -18,6 +18,7 @@
 
 #include <mapnik/box2d.hpp>
 #include <mapnik/color.hpp>
+#include <mapnik/color_factory.hpp>
 #include <mapnik/datasource.hpp>
 #include <mapnik/datasource_cache.hpp>
 #include <mapnik/expression_node.hpp>
@@ -603,21 +604,25 @@ static bool ParseStyle(mapnik::Map &map, const std::string& style_str, const std
         const Json::Value& mapbox_paint = mapbox_layer["paint"];
         const Json::Value& layout = mapbox_layer["layout"];
         if (layout.isObject()) {
-            auto visibility = FromJson<std::string>("visibility");
+            auto visibility = FromJson<std::string>(layout["visibility"]);
             if (visibility && *visibility == "none") {
                 continue;
             }
         }
-        std::string id = FromJson<std::string>("id", "");
-        std::string source_layer_name = FromJson<std::string>("source-layer", "");
-        std::string layer_type = FromJson<std::string>("type", "");
+        std::string id = FromJson<std::string>(mapbox_layer["id"], "");
+        std::string source_layer_name = FromJson<std::string>(mapbox_layer["source-layer"], "");
+        std::string layer_type = FromJson<std::string>(mapbox_layer["type"], "");
 
         std::vector<mapnik::rule> rules;
 
         if (layer_type == "background") {
-            std::string bgcolor_string = mapbox_paint.get("background-color", "#000000").asString();
-            mapnik::color bgcolor(bgcolor_string);
-            map.set_background(bgcolor);
+            std::string bgcolor_string = FromJson<std::string>(mapbox_paint["background-color"], "#000000");
+            try {
+                mapnik::color bgcolor = mapnik::parse_color(bgcolor_string);
+                map.set_background(bgcolor);
+            } catch (const std::exception& e) {
+                LOG(ERROR) << "Failed to parse background color: " << bgcolor_string;
+            }
             continue;
         } else if (layer_type == "fill") {
             if (mapbox_paint.isMember("fill-pattern")) {
